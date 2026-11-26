@@ -1,0 +1,57 @@
+# Unzips chatbot.zip from this repo and publishes it to GitHub Pages.
+# This file must live at:  .github/workflows/build.yaml
+# One-time setup: repo Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Unzip the chatbot and build the site
+        run: |
+          set -e
+          mkdir _unzipped _site
+          zipfile=$(ls *.zip | head -n 1)
+          echo "Using $zipfile"
+          unzip -q "$zipfile" -d _unzipped
+          # Find the folder that holds index.html (works even if the zip has a folder inside)
+          page=$(find _unzipped -name index.html -not -path "*/__MACOSX/*" | head -n 1)
+          if [ -z "$page" ]; then
+            page=$(find _unzipped -name bce_chatbot.html -not -path "*/__MACOSX/*" | head -n 1)
+          fi
+          dir=$(dirname "$page")
+          cp -r "$dir"/. _site/
+          if [ ! -f _site/index.html ]; then cp _site/bce_chatbot.html _site/index.html; fi
+          ls -R _site
+
+      - name: Set up Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4
